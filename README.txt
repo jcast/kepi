@@ -1,26 +1,27 @@
 = kepi
 
-* FIX (url)
+* https://github.com/yaksnrainbows/kepi
 
 == DESCRIPTION:
 
-FIX (describe your package)
+Simple Rack-based service API definition and documentation support.
+Kepi was made possible with the sponsoring of AT&T Interactive.
 
 == FEATURES/PROBLEMS:
 
-* FIX (list of features or problems)
+* Define and document a service app's api in one step.
 
-== SYNOPSIS:
+* Validate param types, or allowed values.
 
-  FIX (code sample of usage)
+* Optionally disallow non-defined params.
 
 == REQUIREMENTS:
 
-* FIX (list of requirements)
+* Works as Rack middleware.
 
 == INSTALL:
 
-* FIX (sudo gem install, anything else)
+* sudo gem install kepi
 
 == DEVELOPERS:
 
@@ -35,7 +36,7 @@ and generate the RDoc.
 
 (The MIT License)
 
-Copyright (c) 2010 FIX
+Copyright (c) 2010 Jeremie Castagna
 
 Permission is hereby granted, free of charge, to any person obtaining
 a copy of this software and associated documentation files (the
