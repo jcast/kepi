@@ -1,0 +1,8 @@
+.autotest
+History.txt
+Manifest.txt
+README.txt
+Rakefile
+bin/kepi
+lib/kepi.rb
+test/test_kepi.rb
