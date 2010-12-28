@@ -15,6 +15,8 @@ Kepi was made possible with the sponsoring of AT&T Interactive.
 
 * Optionally disallow non-defined params.
 
+* Create Rdocs for your service's API!
+
 == REQUIREMENTS:
 
 * Works as Rack middleware.
