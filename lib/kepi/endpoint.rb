@@ -203,34 +203,43 @@ class Kepi
     #   Kepi::Endpoint::ParamUndefined - only if endpoint is strict with params
 
     def validate params
-      params   = params.to_a
-      m_params = @mandatory_params.dup
-      o_params = @optional_params.dup
+      params = validate_for @mandatory_params, params, true
+      params = validate_for @optional_params, params
 
-      m_params.each do |mkey, mval|
+      raise ParamUndefined, "Param #{pname} is not supported" unless
+        params.empty? || @allow_undefined_params
+
+      true
+    end
+
+
+    ##
+    # Runs validation of params against a set of matcher rules.
+    # Returns Array of params that have not been matched.
+    # Raises ParamInvalid if param value does not match given conditions.
+    # Raises ParamMissing if param name was not found in matcher set and
+    # the raise_not_found_errors argument is true.
+
+    def validate_for matcher_hash, params, raise_not_found_errors=false
+      params = params.to_a
+
+      matcher_hash.each do |mkey, mval|
         pname, pvalue = params.detect{|pname, pvalue| match_value mkey, pname}
 
-        raise ParamMissing, "No param name matches #{mkey.inspect}" unless pname
+        if !pname
+          raise ParamMissing, "No param name matches #{mkey.inspect}" if
+            raise_not_found_errors
+
+          next
+        end
+
         raise ParamInvalid, "Param #{pname} didn't match #{mval.inspect}" unless
           match_value mval, pvalue
 
         params.delete [pname, pvalue]
       end
 
-      o_params.each do |okey, oval|
-        pname, pvalue = params.detect{|pname, pvalue| match_value okey, pname}
-        next unless pname
-
-        raise ParamInvalid, "Param #{pname} didn't match #{oval.inspect}" unless
-          match_value oval, pvalue
-
-        params.delete [pname, pvalue]
-      end
-
-      raise ParamUndefined, "Param #{pname} is not supported" unless
-        params.empty? || @allow_undefined_params
-
-      true
+      params
     end
 
 
