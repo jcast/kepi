@@ -44,11 +44,17 @@ class Kepi
     # Keys for params to be retrieved from the path.
     attr_reader :path_keys
 
+    # Params mandatory for endpoint.
+    attr_reader :mandatory_params
+
+    # Params that won't trigger a validation error if missing.
+    attr_reader :optional_params
+
 
     ##
     # Create a new Endpoint param validator.
 
-    def initalize http_method, path_desc
+    def initialize http_method, path_desc
       @http_method = http_method
       @path        = path_desc
 
@@ -107,9 +113,7 @@ class Kepi
     # Define a single mandatory param.
 
     def mandatory_param matcher, validator=nil, desc=nil
-      validator, desc = nil, validator if String === validator
-      validator ||= /.+/
-      @mandatory_params[matcher] = Param.new(matcher, validator, desc)
+      add_param matcher, true, validator, desc
     end
 
 
@@ -117,8 +121,22 @@ class Kepi
     # Define a single optional param.
 
     def optional_param matcher, validator=nil, desc=nil
-      validation ||= /.+/
-      @mandatory_params[matcher] = Param.new(matcher, validator, desc)
+      add_param matcher, false, validator, desc
+    end
+
+
+    ##
+    # Append param to endpoint as mandatory or optional.
+
+    def add_param matcher, mandatory=false, validator=nil, desc=nil
+      param_store = mandatory ? @mandatory_params : @optional_params
+
+      matcher = matcher.to_s if Symbol === matcher
+
+      validator, desc = nil, validator if String === validator
+      validator ||= /.+/
+
+      param_store[matcher] = Param.new(matcher, validator, desc)
     end
 
 
@@ -129,6 +147,7 @@ class Kepi
     def parse_path path
       return path if Regexp === path
 
+      keys = []
       special_chars = %w{. + ( )}
 
       pattern =
