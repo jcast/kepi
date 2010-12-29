@@ -62,6 +62,8 @@ class Kepi
 
       @mandatory_params = {}
       @optional_params  = {}
+
+      mandatory_params @path_keys
     end
 
 
