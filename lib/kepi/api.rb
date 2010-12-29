@@ -117,7 +117,7 @@ class Kepi
       when_undefined req, err
 
     rescue Endpoint::ParamValidationError => err
-      when_invalid req, err
+      when_invalid req, endpoint, err
     end
 
 
@@ -158,7 +158,7 @@ class Kepi
     #
     # Must return a valid Rack response Array. May be overridden by child class.
 
-    def when_invalid req, error
+    def when_invalid req, endpoint, error
       [HTTP_INVALID, {'Content-Type' => DEFAULT_CONTENT_TYPE}, error.to_json]
     end
 

@@ -60,8 +60,8 @@ class Kepi
       @when_invalid = nil
       @when_valid   = nil
 
-      @mandatory_params = []
-      @optional_params  = []
+      @mandatory_params = {}
+      @optional_params  = {}
     end
 
 
@@ -108,12 +108,32 @@ class Kepi
     #                      :limit         => [1...100]
 
     def mandatory_params *params
-      #TODO: implement
       params.each do |name|
         if Hash === name
-          
-          p.each do |name, val|
-          end
+          @mandatory_params.merge! name
+
+        else
+          @mandatory_params[name] = /.+/
+        end
+      end
+    end
+
+
+    ##
+    # Define optional params. Takes an array and/or a hash that
+    # defines how the param must be validated:
+    #   e.mandatory_params :search_terms  => String,
+    #                      /^geo|g$/      => String,
+    #                      :refinements   => %w{valid1 valid2 valid3}
+    #                      :limit         => [1...100]
+
+    def optional_params *params
+      params.each do |name|
+        if Hash === name
+          @optional_params.merge! name
+
+        else
+          @optional_params[name] = /.+/
         end
       end
     end
@@ -183,7 +203,49 @@ class Kepi
     #   Kepi::Endpoint::ParamUndefined - only if endpoint is strict with params
 
     def validate params
-      #TODO: implement
+      params   = params.to_a
+      m_params = @mandatory_params.dup
+      o_params = @optional_params.dup
+
+      m_params.each do |mkey, mval|
+        pname, pvalue = params.detect{|pname, pvalue| match_value mkey, pname}
+
+        raise ParamMissing, "No param name matches #{mkey.inspect}" unless pname
+        raise ParamInvalid, "Param #{pname} didn't match #{mval.inspect}" unless
+          match_value mval, pvalue
+
+        params.delete [pname, pvalue]
+      end
+
+      o_params.each do |okey, oval|
+        pname, pvalue = params.detect{|pname, pvalue| match_value okey, pname}
+        next unless pname
+
+        raise ParamInvalid, "Param #{pname} didn't match #{oval.inspect}" unless
+          match_value oval, pvalue
+
+        params.delete [pname, pvalue]
+      end
+
+      raise ParamUndefined, "Param #{pname} is not supported" unless
+        params.empty? || @allow_undefined_params
+
+      true
+    end
+
+
+    ##
+    # Match a param key or value to a matcher.
+
+    def match_value matcher, value
+      case matcher
+      when Class        then matcher === value
+      when Range, Array then matcher.include?(value)
+      when Regexp       then value.to_s =~ matcher
+      when NilClass     then !value.nil? && !value.to_s.empty?
+      else
+        matcher.to_s == value.to_s
+      end
     end
 
 
