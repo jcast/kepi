@@ -5,4 +5,8 @@ README.rdoc
 Rakefile
 bin/kepi
 lib/kepi.rb
-test/test_kepi.rb
+lib/kepi/api.rb
+lib/kepi/endpoint.rb
+test/test_helper.rb
+test/test_kepi_api.rb
+test/test_kepi_endpoint.rb
