@@ -66,6 +66,32 @@ class Kepi
 
 
     ##
+    # Returns a hash describing the endpoint.
+
+    def api
+      {
+        :http_method => @http_method,
+        :path        => @path,
+        :description => @description,
+        :allow_undefined_params => @allow_undefined_params,
+        :mandatory_params       => @mandatory_params,
+        :optional_params        => @optional_params
+      }
+    end
+
+
+    ##
+    # Ensures the params are valid and calls the action_handler.
+
+    def call req
+      req.params.merge! process_path_params(req.path_info)
+      validate req.params
+
+      @action_handler.call(req) if @action_handler
+    end
+
+
+    ##
     # Check if a given path matches this endpoint.
 
     def matches path
@@ -144,17 +170,6 @@ class Kepi
       else
         {}
       end
-    end
-
-
-    ##
-    # Ensures the params are valid and calls the action_handler.
-
-    def call req
-      req.params.merge! process_path_params(req.path_info)
-      validate req.params
-
-      @action_handler.call(req) if @action_handler
     end
 
 

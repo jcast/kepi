@@ -125,7 +125,8 @@ class Kepi
     # Returns the full api documentation.
 
     def api
-      #TODO: implement
+      endpoints = self.class.endpoints.sort{|x,y| x.path <=> y.path}
+      endpoints.map{|e| e.api}
     end
 
 
