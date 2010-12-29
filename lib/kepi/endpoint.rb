@@ -5,6 +5,8 @@ class Kepi
 
   class Endpoint
 
+    class Param < Struct.new(:matcher, :validator, :description); end
+
     # There was an error with param validation (parent for other param errors).
     class ParamValidationError < Kepi::Exception; end
 
@@ -63,7 +65,7 @@ class Kepi
       @mandatory_params = {}
       @optional_params  = {}
 
-      mandatory_params @path_keys
+      @path_keys.each{|k| mandatory_param k}
     end
 
 
@@ -102,42 +104,21 @@ class Kepi
 
 
     ##
-    # Define mandatory params. Takes an array and/or a hash that
-    # defines how the param must be validated:
-    #   e.mandatory_params :search_terms  => String,
-    #                      /^geo|g$/      => String,
-    #                      :refinements   => %w{valid1 valid2 valid3}
-    #                      :limit         => [1...100]
+    # Define a single mandatory param.
 
-    def mandatory_params *params
-      params.each do |name|
-        if Hash === name
-          @mandatory_params.merge! name
-
-        else
-          @mandatory_params[name] = /.+/
-        end
-      end
+    def mandatory_param matcher, validator=nil, desc=nil
+      validator, desc = nil, validator if String === validator
+      validator ||= /.+/
+      @mandatory_params[matcher] = Param.new(matcher, validator, desc)
     end
 
 
     ##
-    # Define optional params. Takes an array and/or a hash that
-    # defines how the param must be validated:
-    #   e.mandatory_params :search_terms  => String,
-    #                      /^geo|g$/      => String,
-    #                      :refinements   => %w{valid1 valid2 valid3}
-    #                      :limit         => [1...100]
+    # Define a single optional param.
 
-    def optional_params *params
-      params.each do |name|
-        if Hash === name
-          @optional_params.merge! name
-
-        else
-          @optional_params[name] = /.+/
-        end
-      end
+    def optional_param matcher, validator=nil, desc=nil
+      validation ||= /.+/
+      @mandatory_params[matcher] = Param.new(matcher, validator, desc)
     end
 
 
@@ -225,7 +206,7 @@ class Kepi
     def validate_for matcher_hash, params, raise_not_found_errors=false
       params = params.to_a
 
-      matcher_hash.each do |mkey, mval|
+      matcher_hash.each do |mkey, mparam|
         pname, pvalue = params.detect{|pname, pvalue| match_value mkey, pname}
 
         if !pname
@@ -236,7 +217,7 @@ class Kepi
         end
 
         raise ParamInvalid, "Param #{pname} didn't match #{mval.inspect}" unless
-          match_value mval, pvalue
+          match_value mparam.validator, pvalue
 
         params.delete [pname, pvalue]
       end
