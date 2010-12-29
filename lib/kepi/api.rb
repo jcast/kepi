@@ -9,12 +9,29 @@ class Kepi
     # Raised when an endpoint is called but not defined
     class EndpointUndefined < Kepi::Exception; end
 
+    # Default content-type to return.
+    DEFAULT_CONTENT_TYPE = "application/json"
 
     # HTTP error code to use when validation fails.
-    INVALID_HTTP_CODE = 400
+    HTTP_INVALID = 400
 
     # HTTP error code to use when endpoint is undefined.
-    UNDEFINED_HTTP_CODE = 404
+    HTTP_UNDEFINED = 404
+
+
+    class << self
+      # The path suffix to look for to return the api documentation.
+      # Defaults to %r{/api(\.\w+)?} which allows for passing the format
+      # param as "/path/api.format"
+      attr_accessor :api_doc_suffix
+
+      # Global setting to not raise errors when unexpected params are given.
+      # Defaults to false. May be overridden by each endpoint individually.
+      attr_accessor :allow_undefined_params
+    end
+
+    self.api_doc_suffix         = %r{/api(\.[^?/]+)?}
+    self.allow_undefined_params = false
 
 
     ##
@@ -22,49 +39,22 @@ class Kepi
     # If block is given, passes it the newly created Endpoint instance.
 
     def self.endpoint http_method, path
-      http_method   = http_method.to_s.upcase
-      matcher, keys = matcher_for path
+      new_endpoint = Endpoint.new http_method, path
 
-      new_endpoint = Endpoint.new
+      new_endpoint.allow_undefined_params = self.allow_undefined_params
 
-      self.endpoints[http_method][matcher] = [new_endpoint, keys]
+      self.endpoints[http_method] << new_endpoint
 
       yield new_endpoint if block_given?
     end
 
-
-    ##
-    # Converts an endpoint path to its regex matcher.
-    # (Thanks Sinatra!)
-
-    def self.matcher_for path
-      return path if Regexp === path
-
-      special_chars = %w{. + ( )}
-
-      pattern =
-        path.to_str.gsub(/((:\w+)|[\*#{special_chars.join}])/) do |match|
-          case match
-          when "*"
-            keys << 'splat'
-            "(.*?)"
-          when *special_chars
-            Regexp.escape(match)
-          else
-            keys << $2[1..-1]
-            "([^/?#]+)"
-          end
-        end
-
-      [/^#{pattern}$/, keys]
-    end
 
 
     ##
     # The hash of Endpoint objects defined for this api.
 
     def self.endpoints
-      @endpoints ||= Hash.new{|h,k| h[k] = Hash.new }
+      @endpoints ||= Hash.new{|h,k| h[k] = Array.new }
     end
 
 
@@ -76,13 +66,23 @@ class Kepi
     end
 
 
+
+    # If used as middleware, the app given from the Rack stack.
+    attr_reader :app
+
+
     ##
     # Initialize with the provided Rack app object.
+    # May be used as full application by omitting the app argument.
+    #
     # Supported options are:
     # :passthrough:: Bool - Allow undefined endoints through as-is.
 
-    def initialize app, options={}
+    def initialize app=nil, options={}
+      options, app  = app, nil if options.empty? && Hash === app
+
       @app          = app
+      @original_env = nil
       @passthrough  = if options.has_key? :passthrough
                         options[:passthrough]
                       else
@@ -92,19 +92,36 @@ class Kepi
 
 
     ##
-    # Call the validation stack.
+    # Call the validation or api documentation stack.
 
     def call env
-      req = Rack::Request.new env
+      @original_env = env
 
-      validate req.path_info, req.params
-      when_valid @app, env
+      req = Rack::Request.new env.dup
+
+      endpoint = find_endpoint req.path_info
+      raise EndpointUndefined, self.api unless endpoint
+
+      if req.path_info =~ %r{#{self.class.api_doc_suffix}$}i
+        when_api req, endpoint
+
+      else
+        endpoint.call(req) || when_valid(req, endpoint)
+      end
 
     rescue EndpointUndefined => err
-      when_undefined @app, env, err
+      when_undefined req, err
 
-    rescue Kepi::Exception => err
-      when_invalid @app, env, err
+    rescue Endpoint::ParamValidationError => err
+      when_invalid req, err
+    end
+
+
+    ##
+    # Returns the full api documentation.
+
+    def api
+      #TODO: implement
     end
 
 
@@ -114,8 +131,8 @@ class Kepi
     # Keys are used to process params in the path.
 
     def find_endpoint http_method, path
-      self.class.endpoints[http_method].each do |matcher, (endpoint, keys)|
-        return [matcher, endpoint, keys] if path =~ matcher
+      self.class.endpoints[http_method].each do |endpoint|
+        return endpoint if endpoint.matches path
       end
 
       nil
@@ -123,52 +140,10 @@ class Kepi
 
 
     ##
-    # Process request path and return the matching params.
+    # Defines what to do when the api lookup is requested.
 
-    def process_path_params path, pattern, keys
-      match = pattern.match path
-      return Hash.new unless match && !keys.empty?
-
-      values = match.captures.to_a
-
-      if keys.any?
-        keys.zip(values).inject({}) do |hash,(k,v)|
-          if k == 'splat'
-            (hash[k] ||= []) << v
-          else
-            hash[k] = v
-          end
-
-          hash
-        end
-
-      elsif values.any?
-        {'captures' => values}
-
-      else
-        {}
-      end
-    end
-
-
-    ##
-    # Checks if the given path and params are valid, raises an error if not.
-    # Errors raised may be:
-    #   Kepi::Api::EndpointUndefined - only when passthrough is not true
-    #   Kepi::Endpoint::ParamMissing - required param is missing
-    #   Kepi::Endpoint::ParamInvalid - allowed param does not meet criteria
-    #   Kepi::Endpoint::ParamUndefined - only if endpoint is strict with params
-
-    def validate path, params
-      pattern, endpoint, keys = find_endpoint path
-
-      if endpoint
-        params = params.merge process_path_params(path, pattern, keys)
-        endpoint.validate params
-
-      elsif !@passthrough
-        raise EndpointUndefined, path
-      end
+    def when_api req, endpoint
+      [200, {'Content-Type' => "application/json"}, endpoint.api.to_json]
     end
 
 
@@ -178,8 +153,8 @@ class Kepi
     #
     # Must return a valid Rack response Array. May be overridden by child class.
 
-    def when_invalid app, env, error
-      [INVALID_HTTP_CODE, {'Content-Type' => "application/json"}, error.to_json]
+    def when_invalid req, error
+      [HTTP_INVALID, {'Content-Type' => DEFAULT_CONTENT_TYPE}, error.to_json]
     end
 
 
@@ -189,23 +164,23 @@ class Kepi
     #
     # Must return a valid Rack response Array. May be overridden by child class.
 
-    def when_undefined app, env, error
-      [
-        UNDEFINED_HTTP_CODE,
-        {'Content-Type' => "application/json"},
-        error.to_json
-      ]
+    def when_undefined req, error
+      [HTTP_UNDEFINED, {'Content-Type' => DEFAULT_CONTENT_TYPE}, error.to_json]
     end
 
 
     ##
     # Defines globally what to do when all endpoint conditions are met.
-    # By default, forwards the Rack env to the app.
+    # By default, forwards the Rack request to the endpoint's defined action,
+    # then to the app if used as middleware.
     #
     # Must return a valid Rack response Array. May be overridden by child class.
 
-    def when_valid app, env
-      app.call env
+    def when_valid req, endpoint
+      resp   = @app.call req.env if @app
+      resp ||= [200, {'Content-Type' => DEFAULT_CONTENT_TYPE}, ""]
+
+      resp
     end
   end
 end
