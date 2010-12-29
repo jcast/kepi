@@ -151,8 +151,8 @@ class Kepi
     # Ensures the params are valid and calls the action_handler.
 
     def call req
-      params = req.params.merge process_path_params(req.path_info)
-      validate params
+      req.params.merge! process_path_params(req.path_info)
+      validate req.params
 
       @action_handler.call(req) if @action_handler
     end
