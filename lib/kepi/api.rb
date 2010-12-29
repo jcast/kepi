@@ -106,7 +106,11 @@ class Kepi
         when_api req, endpoint
 
       else
-        endpoint.call(req) || when_valid(req, endpoint)
+        ep_resp = endpoint.call(req) ||
+                  [200, {'Content-Type' => DEFAULT_CONTENT_TYPE}, ""]
+
+        resp    = when_valid(req, endpoint)
+        resp || ep_resp
       end
 
     rescue EndpointUndefined => err
@@ -143,7 +147,7 @@ class Kepi
     # Defines what to do when the api lookup is requested.
 
     def when_api req, endpoint
-      [200, {'Content-Type' => "application/json"}, endpoint.api.to_json]
+      [200, {'Content-Type' => DEFAULT_CONTENT_TYPE}, endpoint.api.to_json]
     end
 
 
@@ -177,10 +181,7 @@ class Kepi
     # Must return a valid Rack response Array. May be overridden by child class.
 
     def when_valid req, endpoint
-      resp   = @app.call req.env if @app
-      resp ||= [200, {'Content-Type' => DEFAULT_CONTENT_TYPE}, ""]
-
-      resp
+      @app.call req.env if @app
     end
   end
 end
