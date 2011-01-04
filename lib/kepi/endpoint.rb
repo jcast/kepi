@@ -5,7 +5,18 @@ class Kepi
 
   class Endpoint
 
-    class Param < Struct.new(:matcher, :validator, :description); end
+    class Param < Struct.new(:matcher, :validator, :description)
+      def api
+        {
+          :name        => self.matcher,
+          :validator   => self.validator,
+          :description => self.description
+        }
+      end
+
+      def to_markup
+      end
+    end
 
     # There was an error with param validation (parent for other param errors).
     class ParamValidationError < Kepi::Exception; end
@@ -31,6 +42,12 @@ class Kepi
 
     # Block to call when errors occur.
     attr_accessor :error_handler
+
+    # Block to call when validation errors occur.
+    attr_accessor :validation_error_handler
+
+    # Block to call when a request for the api docs is made.
+    attr_accessor :api_doc_handler
 
     # Path descriptor of endpoint.
     attr_reader :path
@@ -60,13 +77,13 @@ class Kepi
 
       @matcher, @path_keys = self.class.parse_path @path
 
-      @action_handler         = nil
-      @error_handler          = nil
+      @action_handler           = nil
+      @error_handler            = nil
+      @validation_error_handler = nil
+      @api_doc_handler          = nil
+
       @description            = nil
       @allow_undefined_params = false
-
-      @when_invalid = nil
-      @when_valid   = nil
 
       @mandatory_params = {}
       @optional_params  = {}
@@ -84,20 +101,48 @@ class Kepi
         :path        => @path,
         :description => @description,
         :allow_undefined_params => @allow_undefined_params,
-        :mandatory_params       => @mandatory_params,
-        :optional_params        => @optional_params
+        :mandatory_params       => @mandatory_params.map{|p| p.api},
+        :optional_params        => @optional_params.map{|p| p.api}
       }
+    end
+
+
+    ##
+    # Returns a markup formatted String that describes the endpoint.
+
+    def to_markup
+      <<-STR
+== #{@method_name} #{@path}
+
+=== Mandatory Params:
+#{ @mandatory_params.map{|k, param| param.to_markup}.join "\n" }
+
+=== Optional Params:
+#{ @optional_params.map{|k, param| param.to_markup}.join "\n" }
+
+=== Strict Params: #{!@allow_undefined_params}
+      STR
     end
 
 
     ##
     # Ensures the params are valid and calls the action_handler.
 
-    def call req
+    def call env
+      req = Rack::Request.new env
       req.params.merge! process_path_params(req.path_info)
-      validate req.params
 
-      @action_handler.call(req) if @action_handler
+      begin
+        validate req.params
+        @action_handler.call req, self
+
+      rescue => err
+        handler   = @validation_error_handler if ParamValidationError === err
+        handler ||= @error_handler
+
+        raise unless handler
+        handler.call req, self, err
+      end
     end
 
 
@@ -267,7 +312,7 @@ class Kepi
     # Define an action to call for this endpoint.
     # Block takes a single rack_request argument.
 
-    def action &block
+    def on_action &block
       @action_handler = block
     end
 
@@ -276,8 +321,26 @@ class Kepi
     # Determine what to do if there's an error.
     # Block takes two arguments: rack_request and error.
 
-    def error &block
+    def on_error &block
       @error_handler = block
+    end
+
+
+    ##
+    # Determine what to do if there's a validation error.
+    # Block takes two arguments: rack_request and error.
+
+    def on_validation_error &block
+      @validation_error_handler = block
+    end
+
+
+    ##
+    # Determine what to do if the request is for the api documentation.
+    # Block takes a single rack_request argument.
+
+    def on_api_doc &block
+      @api_doc_handler = block
     end
   end
 end

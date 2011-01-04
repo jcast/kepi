@@ -10,13 +10,19 @@ class Kepi
     class EndpointUndefined < Kepi::Exception; end
 
     # Default content-type to return.
-    DEFAULT_CONTENT_TYPE = "application/json"
+    DEFAULT_CONTENT_TYPE = "text/html"
+
+    # HTTP code when api and endpoint action have not been defined.
+    HTTP_NO_CONTENT = 204
 
     # HTTP error code to use when validation fails.
     HTTP_INVALID = 400
 
     # HTTP error code to use when endpoint is undefined.
     HTTP_UNDEFINED = 404
+
+    # HTTP error code for uncaught exceptions.
+    HTTP_INTERNAL_ERROR = 500
 
 
     class << self
@@ -88,6 +94,10 @@ class Kepi
                       else
                         self.class.instance_variable_get "@passthrough"
                       end
+
+      self.class.endpoints.values.flatten.each do |endpoint|
+        endpoint.action_handler ||= method :default_action
+      end
     end
 
 
@@ -99,14 +109,14 @@ class Kepi
 
       req = Rack::Request.new env.dup
 
-      endpoint = find_endpoint req.path_info
+      endpoint = find_endpoint env['HTTP_METHOD'], env['PATH_INFO']
       raise EndpointUndefined, self.api unless endpoint
 
       if req.path_info =~ %r{#{self.class.api_doc_suffix}$}i
         when_api req, endpoint
 
       else
-        ep_resp = endpoint.call(req) ||
+        ep_resp = endpoint.call(env) ||
                   [200, {'Content-Type' => DEFAULT_CONTENT_TYPE}, ""]
 
         resp    = when_valid(req, endpoint)
@@ -125,8 +135,15 @@ class Kepi
     # Returns the full api documentation.
 
     def api
-      endpoints = self.class.endpoints.sort{|x,y| x.path <=> y.path}
-      endpoints.map{|e| e.api}
+      sorted_endpoints.map{|e| e.api}
+    end
+
+
+    ##
+    # Returns a markup String that describes the api.
+
+    def to_markup
+      # TODO: implement
     end
 
 
@@ -145,21 +162,14 @@ class Kepi
 
 
     ##
-    # Defines what to do when the api lookup is requested.
+    # Returns an Array of endpoints sorted by http method and path.
 
-    def when_api req, endpoint
-      [200, {'Content-Type' => DEFAULT_CONTENT_TYPE}, endpoint.api.to_json]
-    end
+    def sorted_endpoints
+      endpoints = self.class.endpoints.values.flatten
 
-
-    ##
-    # Defines globally what to do when not all endpoint conditions are met.
-    # By default, returns a 400 error with a json body.
-    #
-    # Must return a valid Rack response Array. May be overridden by child class.
-
-    def when_invalid req, endpoint, error
-      [HTTP_INVALID, {'Content-Type' => DEFAULT_CONTENT_TYPE}, error.to_json]
+      endpoints.sort do |x,y|
+        "#{x.path} #{x.http_method}" <=> "#{y.path} #{y.http_method}"
+      end
     end
 
 
@@ -170,19 +180,83 @@ class Kepi
     # Must return a valid Rack response Array. May be overridden by child class.
 
     def when_undefined req, error
-      [HTTP_UNDEFINED, {'Content-Type' => DEFAULT_CONTENT_TYPE}, error.to_json]
+      msg = "= #{error.class}:\n#{error.message}\n\n"
+      msg << to_markup
+
+      response HTTP_UNDEFINED, msg
     end
 
 
     ##
-    # Defines globally what to do when all endpoint conditions are met.
-    # By default, forwards the Rack request to the endpoint's defined action,
-    # then to the app if used as middleware.
+    # Defines the default behavior when endpoint conditions are met.
+    # By default, forwards the Rack env to the app if used as middleware,
+    # otherwise returns a blank Rack response Array.
     #
     # Must return a valid Rack response Array. May be overridden by child class.
 
-    def when_valid req, endpoint
-      @app.call req.env if @app
+    def default_action req, endpoint
+      return @app.call req.env if @app
+      response HTTP_NO_CONTENT
+    end
+
+
+    ##
+    # Default response to use when the api doc is requested.
+    #
+    # Must return a valid Rack response Array. May be overridden by child class.
+
+    def default_api_doc req, endpoint
+      response endpoint.to_markup
+    end
+
+
+    ##
+    # Default endpoint error handler.
+    #
+    # Must return a valid Rack response Array. May be overridden by child class.
+
+    def default_error req, endpoint, error
+      msg = "= #{error.class}:\n#{error.message}\n\n"
+      msg << error.backtrace
+
+      response HTTP_INTERNAL_ERROR, msg
+    end
+
+
+    ##
+    # Defines by default what to do when not all endpoint conditions are met.
+    # By default, returns a 400 error with the error and endpoint
+    # markup string as text in the body.
+    #
+    # Must return a valid Rack response Array. May be overridden by child class.
+
+    def default_validation_error req, endpoint, error
+      msg = "= #{error.class}:\n#{error.message}\n\n"
+      msg << endpoint.to_markup
+
+      response HTTP_INVALID, msg
+    end
+
+
+    ##
+    # Builds a default response Array, given a status code and http body String.
+
+    def response code=nil, body=nil, headers=nil
+      args = [code, body, headers].compact
+
+      headers = {'Content-Type' => DEFAULT_CONTENT_TYPE}
+      code    = 200
+      body    = ""
+
+      args.each do |arg|
+        case arg
+        when Hash    then headers.merge!(arg)
+        when String  then body    = arg
+        when Integer then code    = arg
+        end
+      end
+
+      [code, headers, body]
     end
   end
 end

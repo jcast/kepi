@@ -16,6 +16,19 @@ class TestKepiEndpoint < Test::Unit::TestCase
   end
 
 
+  def test_call
+    req = mock "req"
+    req.stubs(:params).returns()
+    
+  end
+
+
+  def test_matches
+    assert @endpoint.matches("resource/1234")
+    assert !@endpoint.matches("resource/1234/foobar")
+  end
+
+
   def test_path_params
     id_param = @endpoint.mandatory_params['id']
 
@@ -261,7 +274,7 @@ class TestKepiEndpoint < Test::Unit::TestCase
   def test_action_handler
     ran = false
 
-    @endpoint.action do
+    @endpoint.on_action do
       ran = true
     end
 
@@ -273,11 +286,35 @@ class TestKepiEndpoint < Test::Unit::TestCase
   def test_error_handler
     ran = false
 
-    @endpoint.error do
+    @endpoint.on_error do
       ran = true
     end
 
     @endpoint.error_handler.call
+    assert ran
+  end
+
+
+  def test_validation_error_handler
+    ran = false
+
+    @endpoint.on_validation_error do
+      ran = true
+    end
+
+    @endpoint.validation_error_handler.call
+    assert ran
+  end
+
+
+  def test_api_doc_handler
+    ran = false
+
+    @endpoint.on_api_doc do
+      ran = true
+    end
+
+    @endpoint.api_doc_handler.call
     assert ran
   end
 end
