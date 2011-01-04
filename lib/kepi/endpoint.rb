@@ -58,7 +58,7 @@ class Kepi
       @http_method = http_method
       @path        = path_desc
 
-      @matcher, @path_keys = parse_path @path
+      @matcher, @path_keys = self.class.parse_path @path
 
       @action_handler         = nil
       @error_handler          = nil
@@ -144,8 +144,8 @@ class Kepi
     # Converts an endpoint path to its regex matcher.
     # (Thanks Sinatra!)
 
-    def parse_path path
-      return path if Regexp === path
+    def self.parse_path path
+      return [path, []] if Regexp === path
 
       keys = []
       special_chars = %w{. + ( )}
@@ -170,6 +170,7 @@ class Kepi
 
     ##
     # Process request path and return the matching params.
+    # (Thanks Sinatra!)
 
     def process_path_params path
       match  = @matcher.match path
@@ -208,7 +209,8 @@ class Kepi
       params = validate_for @mandatory_params, params, true
       params = validate_for @optional_params, params
 
-      raise ParamUndefined, "Param #{pname} is not supported" unless
+      raise ParamUndefined,
+        "Param #{params.keys.map{|k| "'#{k}'"}.join ", "} not supported" unless
         params.empty? || @allow_undefined_params
 
       true
@@ -223,7 +225,7 @@ class Kepi
     # the raise_not_found_errors argument is true.
 
     def validate_for matcher_hash, params, raise_not_found_errors=false
-      params = params.to_a
+      params = params.dup
 
       matcher_hash.each do |mkey, mparam|
         pname, pvalue = params.detect{|pname, pvalue| match_value mkey, pname}
@@ -235,10 +237,11 @@ class Kepi
           next
         end
 
-        raise ParamInvalid, "Param #{pname} didn't match #{mval.inspect}" unless
+        raise ParamInvalid,
+          "Param #{pname} didn't match #{mparam.validator.inspect}" unless
           match_value mparam.validator, pvalue
 
-        params.delete [pname, pvalue]
+        params.delete pname
       end
 
       params
