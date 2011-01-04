@@ -36,7 +36,7 @@ class Kepi
     end
 
     self.api_doc_suffix         = "/api"
-    self.api_doc_endpoint       = "/api"
+    self.api_doc_path           = "/api"
     self.allow_undefined_params = false
 
 
@@ -64,15 +64,6 @@ class Kepi
     end
 
 
-    ##
-    # Pass through calls for undefined endpoints.
-
-    def self.passthrough!
-      @passthrough = true
-    end
-
-
-
     # If used as middleware, the app given from the Rack stack.
     attr_reader :app
 
@@ -80,54 +71,48 @@ class Kepi
     ##
     # Initialize with the provided Rack app object.
     # May be used as full application by omitting the app argument.
-    #
-    # Supported options are:
-    # :passthrough:: Bool - Allow undefined endoints through as-is.
 
-    def initialize app=nil, options={}
-      options, app  = app, nil if options.empty? && Hash === app
-
-      @app          = app
-      @original_env = nil
-      @passthrough  = if options.has_key? :passthrough
-                        options[:passthrough]
-                      else
-                        self.class.instance_variable_get "@passthrough"
-                      end
+    def initialize app=nil
+      options, app = app, nil if options.empty? && Hash === app
+      @app = app
 
       self.class.endpoints.values.flatten.each do |endpoint|
-        endpoint.action_handler ||= method :default_action
+        endpoint.action_handler           ||= method :default_action
+        endpoint.api_doc_handler          ||= method :default_api_doc
+        endpoint.error_handler            ||= method :default_error
+        endpoint.validation_error_handler ||= method :default_validation_error
       end
     end
 
 
     ##
-    # Call the validation or api documentation stack.
+    # Call the api + endpoint stack.
 
     def call env
-      @original_env = env
+      path, show_api = parse_path_api env['PATH_INFO']
+      endpoint       = find_endpoint env['HTTP_METHOD'], path
 
-      req = Rack::Request.new env.dup
+      if endpoint
+        endpoint.call env, show_api
 
-      endpoint = find_endpoint env['HTTP_METHOD'], env['PATH_INFO']
-      raise EndpointUndefined, self.api unless endpoint
+      elsif env['PATH_INFO'] == self.class.api_doc_path
+        api_response
 
-      if req.path_info =~ %r{#{self.class.api_doc_suffix}$}i
-        when_api req, endpoint
+      elsif @app
+        @app.call env
 
       else
-        ep_resp = endpoint.call(env) ||
-                  [200, {'Content-Type' => DEFAULT_CONTENT_TYPE}, ""]
-
-        resp    = when_valid(req, endpoint)
-        resp || ep_resp
+        undefined_response env
       end
+    end
 
-    rescue EndpointUndefined => err
-      when_undefined req, err
 
-    rescue Endpoint::ParamValidationError => err
-      when_invalid req, endpoint, err
+    ##
+    # Figure out if the given path should return the api docs for that path.
+
+    def parse_path_api path
+      return path unless path =~ %r{(.*)#{self.class.api_doc_suffix}$}i
+      [$1, true]
     end
 
 
@@ -171,20 +156,6 @@ class Kepi
 
 
     ##
-    # Defines globally what to do when not all endpoint conditions are met.
-    # By default, returns a 404 error with a json body.
-    #
-    # Must return a valid Rack response Array. May be overridden by child class.
-
-    def when_undefined req, error
-      msg = "= #{error.class}:\n#{error.message}\n\n"
-      msg << to_markup
-
-      response HTTP_UNDEFINED, msg
-    end
-
-
-    ##
     # Defines the default behavior when endpoint conditions are met.
     # By default, forwards the Rack env to the app if used as middleware,
     # otherwise returns a blank Rack response Array.
@@ -203,7 +174,7 @@ class Kepi
     # Must return a valid Rack response Array. May be overridden by child class.
 
     def default_api_doc req, endpoint
-      response endpoint.to_markup
+      response api_html(endpoint.to_markup)
     end
 
 
@@ -216,7 +187,7 @@ class Kepi
       msg = "= #{error.class}:\n#{error.message}\n\n"
       msg << error.backtrace
 
-      response HTTP_INTERNAL_ERROR, msg
+      response HTTP_INTERNAL_ERROR, api_html(msg)
     end
 
 
@@ -231,7 +202,20 @@ class Kepi
       msg = "= #{error.class}:\n#{error.message}\n\n"
       msg << endpoint.to_markup
 
-      response HTTP_INVALID, msg
+      response HTTP_INVALID, api_html(msg)
+    end
+
+
+    ##
+    # Wraps the given String in the api doc html layout.
+
+    def api_html page
+      <<-STR
+<html>
+  <head><title>#{self.class} Api Documentation</title></head>
+  <body>#{page.to_html}</body>
+</html>
+      STR
     end
 
 
@@ -254,6 +238,29 @@ class Kepi
       end
 
       [code, headers, body]
+    end
+
+
+    ##
+    # Defines globally what to do when not all endpoint conditions are met.
+    # By default, returns a 404 error with a html body.
+    #
+    # Must return a valid Rack response Array. May be overridden by child class.
+
+    def undefined_response env
+      msg = "= Endpoint Undefined:\n"
+      msg << "No endpoint responded to #{env['PATH_INFO']}\n\n"
+      msg << to_markup
+
+      response HTTP_UNDEFINED, api_html(msg)
+    end
+
+
+    ##
+    # The main API html response.
+
+    def api_response
+      response api_html(to_markup)
     end
   end
 end

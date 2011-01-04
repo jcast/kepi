@@ -109,9 +109,11 @@ class Kepi
     ##
     # Ensures the params are valid and calls the action_handler.
 
-    def call env
+    def call env, show_api=false
       req = Rack::Request.new env
       req.params.merge! process_path_params(req.path_info)
+
+      return @api_doc_handler.call req, self if show_api
 
       begin
         validate req.params
