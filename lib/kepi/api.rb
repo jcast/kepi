@@ -27,8 +27,7 @@ class Kepi
 
     class << self
       # The path suffix to look for to return the api documentation.
-      # Defaults to %r{/api(\.\w+)?} which allows for passing the format
-      # param as "/path/api.format"
+      # Defaults to /api
       attr_accessor :api_doc_suffix
 
       # Global setting to not raise errors when unexpected params are given.
@@ -36,7 +35,7 @@ class Kepi
       attr_accessor :allow_undefined_params
     end
 
-    self.api_doc_suffix         = %r{/api(\.[^?/]+)?}
+    self.api_doc_suffix         = "/api"
     self.allow_undefined_params = false
 
 
@@ -132,18 +131,15 @@ class Kepi
 
 
     ##
-    # Returns the full api documentation.
-
-    def api
-      sorted_endpoints.map{|e| e.api}
-    end
-
-
-    ##
     # Returns a markup String that describes the api.
 
     def to_markup
-      # TODO: implement
+      <<-STR
+= #{self.class}
+#{  sorted_endpoints.map do |e|
+      "\"#{e.http_method} #{e.path}\":#{e.path}#{self.class.api_doc_suffix}"
+    end.join "\n" }
+      STR
     end
 
 

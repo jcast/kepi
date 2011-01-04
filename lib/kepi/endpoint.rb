@@ -6,15 +6,11 @@ class Kepi
   class Endpoint
 
     class Param < Struct.new(:matcher, :validator, :description)
-      def api
-        {
-          :name        => self.matcher,
-          :validator   => self.validator,
-          :description => self.description
-        }
-      end
-
       def to_markup
+        <<-STR
+* #{matcher.inspect}: #{validator.inspect}
+  #{description}
+        STR
       end
     end
 
@@ -89,21 +85,6 @@ class Kepi
       @optional_params  = {}
 
       @path_keys.each{|k| mandatory_param k}
-    end
-
-
-    ##
-    # Returns a hash describing the endpoint.
-
-    def api
-      {
-        :http_method => @http_method,
-        :path        => @path,
-        :description => @description,
-        :allow_undefined_params => @allow_undefined_params,
-        :mandatory_params       => @mandatory_params.map{|p| p.api},
-        :optional_params        => @optional_params.map{|p| p.api}
-      }
     end
 
 
