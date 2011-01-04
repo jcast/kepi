@@ -36,6 +36,7 @@ class Kepi
     end
 
     self.api_doc_suffix         = "/api"
+    self.api_doc_endpoint       = "/api"
     self.allow_undefined_params = false
 
 

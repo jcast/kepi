@@ -1,3 +1,6 @@
+require 'rubygems'
+require 'redcloth'
+
 class Kepi
 
   # Version of this gem.
