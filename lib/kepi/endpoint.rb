@@ -68,7 +68,7 @@ class Kepi
     # Create a new Endpoint param validator.
 
     def initialize http_method, path_desc
-      @http_method = http_method
+      @http_method = http_method.to_s.upcase
       @path        = path_desc
 
       @matcher, @path_keys = self.class.parse_path @path

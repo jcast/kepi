@@ -30,6 +30,10 @@ class Kepi
       # Defaults to /api
       attr_accessor :api_doc_suffix
 
+      # The path to get to the root of the api documentation.
+      # Defaults to /api
+      attr_accessor :api_doc_path
+
       # Global setting to not raise errors when unexpected params are given.
       # Defaults to false. May be overridden by each endpoint individually.
       attr_accessor :allow_undefined_params
@@ -73,7 +77,6 @@ class Kepi
     # May be used as full application by omitting the app argument.
 
     def initialize app=nil
-      options, app = app, nil if options.empty? && Hash === app
       @app = app
 
       self.class.endpoints.values.flatten.each do |endpoint|
@@ -89,6 +92,7 @@ class Kepi
     # Call the api + endpoint stack.
 
     def call env
+      load __FILE__
       path, show_api = parse_path_api env['PATH_INFO']
       endpoint       = find_endpoint env['HTTP_METHOD'], path
 
@@ -121,10 +125,12 @@ class Kepi
 
     def to_markup
       <<-STR
-= #{self.class}
-#{  sorted_endpoints.map do |e|
-      "\"#{e.http_method} #{e.path}\":#{e.path}#{self.class.api_doc_suffix}"
-    end.join "\n" }
+= #{self.class} Api
+
+#{sorted_endpoints.map do |e|
+    "* {#{e.http_method} #{e.path}}[/#{e.path}#{self.class.api_doc_suffix}]" +
+    "\n  _#{e.description}_"
+  end.join "\n\n" }
       STR
     end
 
@@ -213,7 +219,7 @@ class Kepi
       <<-STR
 <html>
   <head><title>#{self.class} Api Documentation</title></head>
-  <body>#{page.to_html}</body>
+  <body>#{RDoc::Markup::ToHtml.new.convert page.to_s}</body>
 </html>
       STR
     end

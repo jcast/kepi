@@ -1,5 +1,5 @@
 require 'rubygems'
-require 'redcloth'
+require 'rdoc/markup/to_html'
 
 class Kepi
 
