@@ -39,9 +39,12 @@ class Kepi
       attr_accessor :allow_undefined_params
     end
 
-    self.api_doc_suffix         = "/api"
-    self.api_doc_path           = "/api"
-    self.allow_undefined_params = false
+
+    def self.inherited subclass
+      subclass.api_doc_suffix         = "/api"
+      subclass.api_doc_path           = "/api"
+      subclass.allow_undefined_params = false
+    end
 
 
     ##
@@ -49,6 +52,7 @@ class Kepi
     # If block is given, passes it the newly created Endpoint instance.
 
     def self.endpoint http_method, path
+      http_method  = http_method.to_s.upcase
       new_endpoint = Endpoint.new http_method, path
 
       new_endpoint.allow_undefined_params = self.allow_undefined_params
@@ -92,12 +96,13 @@ class Kepi
     # Call the api + endpoint stack.
 
     def call env
-      load __FILE__
+      #load File.join(LIB_ROOT, "kepi/api.rb")
       path, show_api = parse_path_api env['PATH_INFO']
-      endpoint       = find_endpoint env['HTTP_METHOD'], path
+      endpoint       = find_endpoint env['REQUEST_METHOD'], path
 
       if endpoint
-        endpoint.call env, show_api
+        env['PATH_INFO'] = path
+        response(*endpoint.call(env, show_api))
 
       elsif env['PATH_INFO'] == self.class.api_doc_path
         api_response
@@ -128,8 +133,9 @@ class Kepi
 = #{self.class} Api
 
 #{sorted_endpoints.map do |e|
-    "* {#{e.http_method} #{e.path}}[/#{e.path}#{self.class.api_doc_suffix}]" +
-    "\n  _#{e.description}_"
+    "=== #{e.http_method} #{e.path}\n\n" +
+    "<em>#{e.description}</em>\n\n" +
+    "Details at link:#{e.path}#{self.class.api_doc_suffix}"
   end.join "\n\n" }
       STR
     end
@@ -190,7 +196,7 @@ class Kepi
     # Must return a valid Rack response Array. May be overridden by child class.
 
     def default_error req, endpoint, error
-      msg = "= #{error.class}:\n#{error.message}\n\n"
+      msg = "= #{error.class}:\n<b>#{error.message}</b>\n\n"
       msg << error.backtrace
 
       response HTTP_INTERNAL_ERROR, api_html(msg)
@@ -205,12 +211,15 @@ class Kepi
     # Must return a valid Rack response Array. May be overridden by child class.
 
     def default_validation_error req, endpoint, error
-      msg = "= #{error.class}:\n#{error.message}\n\n"
+      msg = "= #{error.class}:\n<b>#{error.message}</b>\n\n---\n"
       msg << endpoint.to_markup
+      msg << "\n\n---\n#{to_markup}"
 
       response HTTP_INVALID, api_html(msg)
     end
 
+
+    API_CSS = File.read File.join(LIB_ROOT, "rdoc.css")
 
     ##
     # Wraps the given String in the api doc html layout.
@@ -218,8 +227,17 @@ class Kepi
     def api_html page
       <<-STR
 <html>
-  <head><title>#{self.class} Api Documentation</title></head>
-  <body>#{RDoc::Markup::ToHtml.new.convert page.to_s}</body>
+  <head>
+    <title>#{self.class} Api Documentation</title>
+    <style>
+#{API_CSS}
+    </style>
+  </head>
+  <body class="indexpage">
+    <div>
+    #{RDoc::Markup::ToHtml.new.convert page.to_s}
+    </div>
+  </body>
 </html>
       STR
     end
@@ -255,7 +273,7 @@ class Kepi
 
     def undefined_response env
       msg = "= Endpoint Undefined:\n"
-      msg << "No endpoint responded to #{env['PATH_INFO']}\n\n"
+      msg << "<b>No endpoint responded to #{env['PATH_INFO']}</b>\n\n---\n"
       msg << to_markup
 
       response HTTP_UNDEFINED, api_html(msg)

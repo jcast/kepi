@@ -7,10 +7,7 @@ class Kepi
 
     class Param < Struct.new(:matcher, :validator, :description)
       def to_markup
-        <<-STR
-* #{matcher.inspect}: #{validator.inspect}
-  #{description}
-        STR
+        "* #{matcher.to_s}: #{validator.inspect}\n  #{description}"
       end
     end
 
@@ -92,17 +89,24 @@ class Kepi
     # Returns a markup formatted String that describes the endpoint.
 
     def to_markup
+      mandatories = @mandatory_params.map{|k, param| param.to_markup}.join "\n"
+      mandatories = "* _none_" if mandatories.empty?
+
+      optionals = @optional_params.map{|k, param| param.to_markup}.join "\n"
+      optionals = "* _none_" if optionals.empty?
+
       <<-STR
-== #{@method_name} #{@path}
-
-=== Mandatory Params:
-#{ @mandatory_params.map{|k, param| param.to_markup}.join "\n" }
-
-=== Optional Params:
-#{ @optional_params.map{|k, param| param.to_markup}.join "\n" }
+= #{@http_method} #{@path}
+<b><em>#{@description}</em></b>
 
 === Strict Params: #{!@allow_undefined_params}
-      STR
+
+=== Mandatory Params:
+#{ mandatories }
+
+=== Optional Params:
+#{ optionals }
+STR
     end
 
 
@@ -119,7 +123,7 @@ class Kepi
         validate req.params
         @action_handler.call req, self
 
-      rescue => err
+      rescue Exception => err
         handler   = @validation_error_handler if ParamValidationError === err
         handler ||= @error_handler
 
@@ -266,7 +270,7 @@ class Kepi
         end
 
         raise ParamInvalid,
-          "Param #{pname} didn't match #{mparam.validator.inspect}" unless
+          "Param #{pname} did not match #{mparam.validator.inspect}" unless
           match_value mparam.validator, pvalue
 
         params.delete pname

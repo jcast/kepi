@@ -9,7 +9,7 @@ Hoe.spec 'kepi' do
   self.history_file     = "History.rdoc"
   self.extra_rdoc_files = FileList['*.rdoc']
 
-  self.extra_deps << ['rdoc', '~>2.5']
+  self.extra_deps << ['rdoc', '~>3.3']
 
   self.extra_dev_deps << ['rack-test', '>=0.5.3']
   self.extra_dev_deps << ['mocha',     '>=0.9.9']
