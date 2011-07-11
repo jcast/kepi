@@ -5,7 +5,7 @@ class Kepi
 
   class Endpoint
 
-    class Param < Struct.new(:name, :validator, :description)
+    class Param < Struct.new(:name, :required, :validator, :description)
       def to_markup
         "* #{name.to_s}: #{validator.inspect}\n  #{description}"
       end
@@ -55,12 +55,6 @@ class Kepi
     # Keys for params to be retrieved from the path.
     attr_reader :path_keys
 
-    # Params mandatory for endpoint.
-    attr_reader :mandatory_params
-
-    # Params that won't trigger a validation error if missing.
-    attr_reader :optional_params
-
 
     ##
     # Create a new Endpoint param validator.
@@ -79,10 +73,9 @@ class Kepi
       @description            = nil
       @allow_undefined_params = false
 
-      @mandatory_params = {}
-      @optional_params  = {}
+      @params = {}
 
-      @path_keys.each{|k| mandatory_param k}
+      @path_keys.each{|k| required_param k}
     end
 
 
@@ -90,11 +83,11 @@ class Kepi
     # Returns a markup formatted String that describes the endpoint.
 
     def to_markup
-      mandatories = @mandatory_params.map{|k, param| param.to_markup}.join "\n"
-      mandatories = "* _none_" if mandatories.empty?
+      required = required_params.map{|param| param.to_markup}.join "\n"
+      required = "* _none_" if required.empty?
 
-      optionals = @optional_params.map{|k, param| param.to_markup}.join "\n"
-      optionals = "* _none_" if optionals.empty?
+      optional = optional_params.map{|param| param.to_markup}.join "\n"
+      optional = "* _none_" if optional.empty?
 
       <<-STR
 = #{@http_method} #{@path}
@@ -103,10 +96,10 @@ class Kepi
 === Strict Params: #{!@allow_undefined_params}
 
 === Mandatory Params:
-#{ mandatories }
+#{ required }
 
 === Optional Params:
-#{ optionals }
+#{ optional }
 STR
     end
 
@@ -144,10 +137,18 @@ STR
 
 
     ##
-    # Define a single mandatory param.
+    # Define a single required param.
 
-    def mandatory_param name, validator=nil, desc=nil
+    def required_param name, validator=nil, desc=nil
       add_param name, true, validator, desc
+    end
+
+
+    ##
+    # Returns array of required params.
+
+    def required_params
+      @params.values.select{|param| param.required }
     end
 
 
@@ -160,17 +161,24 @@ STR
 
 
     ##
-    # Append param to endpoint as mandatory or optional.
+    # Returns array of optional params.
 
-    def add_param name, mandatory=false, validator=nil, desc=nil
-      param_store = mandatory ? @mandatory_params : @optional_params
+    def optional_params
+      @params.values.select{|param| !param.required }
+    end
 
+
+    ##
+    # Append param to endpoint as required or optional.
+
+    def add_param name, required=false, validator=nil, desc=nil
       name = name.to_s if Symbol === name
+      return if name.to_s.empty?
 
       validator, desc = nil, validator if String === validator
       validator ||= /.+/
 
-      param_store[name] = Param.new(name, validator, desc)
+      @params[name] = Param.new(name, required, validator, desc)
     end
 
 
@@ -240,36 +248,17 @@ STR
     #   Kepi::Endpoint::ParamUndefined - only if endpoint is strict with params
 
     def validate params
-      params = validate_for @mandatory_params, params, true
-      params = validate_for @optional_params, params
-
-      raise ParamUndefined,
-        "Param #{params.keys.map{|k| "'#{k}'"}.join ", "} not supported" unless
-        params.empty? || @allow_undefined_params
-
-      true
-    end
-
-
-    ##
-    # Runs validation of params against a set of matcher rules.
-    # Returns Array of params that have not been matched.
-    # Raises ParamInvalid if param value does not match given conditions.
-    # Raises ParamMissing if param name was not found in matcher set and
-    # the raise_not_found_errors argument is true.
-
-    def validate_for matcher_hash, params, raise_not_found_errors=false
       params = params.dup
 
-      matcher_hash.each do |mkey, mparam|
-        pname, pvalue = params.detect{|pname, pvalue| match_value mkey, pname}
+      @params.each do |mkey, mparam|
+        pname, pvalue = params.detect do |pname, pvalue|
+                          match_value mparam.name, pname
+                        end
 
-        if !pname
-          raise ParamMissing, "No param name matches #{mkey.inspect}" if
-            raise_not_found_errors
+        raise ParamMissing, "No param name matches #{mkey.inspect}" if
+          !pname && mparam.required
 
-          next
-        end
+        next if !pname
 
         raise ParamInvalid,
           "Param #{pname} did not match #{mparam.validator.inspect}" unless
@@ -278,7 +267,11 @@ STR
         params.delete pname
       end
 
-      params
+      raise ParamUndefined,
+        "Param #{params.keys.map{|k| "'#{k}'"}.join ", "} not supported" unless
+          params.empty? || @allow_undefined_params
+
+      true
     end
 
 

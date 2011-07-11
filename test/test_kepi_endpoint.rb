@@ -6,13 +6,13 @@ class TestKepiEndpoint < Test::Unit::TestCase
     @endpoint = Kepi::Endpoint.new :get, "resource/:id"
     @endpoint.description = "Get the resource with specified id"
 
-    @endpoint.mandatory_param /^search_term|q$/, String
-    @endpoint.mandatory_param :zip, /\d{5}(-\d{4})?/
+    @endpoint.required_param /^search_term|q$/, String
+    @endpoint.required_param :zip, /\d{5}(-\d{4})?/
 
     @endpoint.optional_param /^limit|h$/,  Integer
     @endpoint.optional_param /^offset|o$/, Integer
 
-    @matcher_hash = @endpoint.mandatory_params
+    @matcher_hash = @endpoint.required_params
   end
 
 
@@ -30,7 +30,7 @@ class TestKepiEndpoint < Test::Unit::TestCase
 
 
   def test_path_params
-    id_param = @endpoint.mandatory_params['id']
+    id_param = @endpoint.required_params['id']
 
     assert Kepi::Endpoint::Param === id_param
     assert_equal(/.+/, id_param.validator)
@@ -38,8 +38,8 @@ class TestKepiEndpoint < Test::Unit::TestCase
 
 
   def test_path_param_override
-    @endpoint.mandatory_param :id, Integer, "Id of the resource"
-    id_param = @endpoint.mandatory_params['id']
+    @endpoint.required_param :id, Integer, "Id of the resource"
+    id_param = @endpoint.required_params['id']
 
     assert_equal Integer, id_param.validator
     assert_equal "Id of the resource", id_param.description
@@ -55,18 +55,18 @@ class TestKepiEndpoint < Test::Unit::TestCase
   end
 
 
-  def test_mandatory_param
-    @endpoint.mandatory_param :q, String, "Query to send"
-    id_param = @endpoint.mandatory_params['q']
+  def test_required_param
+    @endpoint.required_param :q, String, "Query to send"
+    id_param = @endpoint.required_params['q']
 
     assert_equal String, id_param.validator
     assert_equal "Query to send", id_param.description
   end
 
 
-  def test_add_param_mandatory
+  def test_add_param_required
     @endpoint.add_param :q, true, String, "Query to send"
-    id_param = @endpoint.mandatory_params['q']
+    id_param = @endpoint.required_params['q']
 
     assert_equal String, id_param.validator
     assert_equal "Query to send", id_param.description
@@ -202,47 +202,6 @@ class TestKepiEndpoint < Test::Unit::TestCase
 
     assert_raises Kepi::Endpoint::ParamMissing do
       assert @endpoint.validate(params)
-    end
-  end
-
-
-  def test_validate_for
-    params = {
-      :q   => "pizza",
-      :zip => 91026
-    }
-
-    assert @endpoint.validate_for(@matcher_hash, params)
-
-    params = {
-      :search_terms => "pizza",
-      :zip          => "91026-1234"
-    }
-
-    new_params = @endpoint.validate_for(@matcher_hash, params)
-
-    assert new_params
-    assert new_params.empty?
-    assert_not_equal new_params, params
-  end
-
-
-  def test_validate_for_missing_param
-    params = {:q => "pizza"}
-
-    assert @endpoint.validate_for(@matcher_hash, params)
-
-    assert_raises Kepi::Endpoint::ParamMissing do
-      @endpoint.validate_for @matcher_hash, params, true
-    end
-  end
-
-
-  def test_validate_for_invalid_param
-    params = {:q => 1234}
-
-    assert_raises Kepi::Endpoint::ParamInvalid do
-      @endpoint.validate_for @matcher_hash, params
     end
   end
 
