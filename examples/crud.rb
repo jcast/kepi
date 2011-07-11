@@ -15,7 +15,7 @@ class Crud < Kepi::Api
     e.optional_param :name, String
 
     e.on_action do |req, e|
-      "Here is your resource: #{req.params['id']}"
+      "Here is your updated resource: #{req.params['id']}"
     end
   end
 end

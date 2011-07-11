@@ -5,11 +5,12 @@ class Kepi
 
   class Endpoint
 
-    class Param < Struct.new(:matcher, :validator, :description)
+    class Param < Struct.new(:name, :validator, :description)
       def to_markup
-        "* #{matcher.to_s}: #{validator.inspect}\n  #{description}"
+        "* #{name.to_s}: #{validator.inspect}\n  #{description}"
       end
     end
+
 
     # There was an error with param validation (parent for other param errors).
     class ParamValidationError < Kepi::Exception; end
@@ -124,8 +125,9 @@ STR
         @action_handler.call req, self
 
       rescue Exception => err
-        handler   = @validation_error_handler if ParamValidationError === err
-        handler ||= @error_handler
+        handler = ParamValidationError === err ?
+                    @validation_error_handler  :
+                    @error_handler
 
         raise unless handler
         handler.call req, self, err
@@ -144,31 +146,31 @@ STR
     ##
     # Define a single mandatory param.
 
-    def mandatory_param matcher, validator=nil, desc=nil
-      add_param matcher, true, validator, desc
+    def mandatory_param name, validator=nil, desc=nil
+      add_param name, true, validator, desc
     end
 
 
     ##
     # Define a single optional param.
 
-    def optional_param matcher, validator=nil, desc=nil
-      add_param matcher, false, validator, desc
+    def optional_param name, validator=nil, desc=nil
+      add_param name, false, validator, desc
     end
 
 
     ##
     # Append param to endpoint as mandatory or optional.
 
-    def add_param matcher, mandatory=false, validator=nil, desc=nil
+    def add_param name, mandatory=false, validator=nil, desc=nil
       param_store = mandatory ? @mandatory_params : @optional_params
 
-      matcher = matcher.to_s if Symbol === matcher
+      name = name.to_s if Symbol === matcher
 
       validator, desc = nil, validator if String === validator
       validator ||= /.+/
 
-      param_store[matcher] = Param.new(matcher, validator, desc)
+      param_store[name] = Param.new(name, validator, desc)
     end
 
 
