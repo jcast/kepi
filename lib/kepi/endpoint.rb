@@ -165,7 +165,7 @@ STR
     def add_param name, mandatory=false, validator=nil, desc=nil
       param_store = mandatory ? @mandatory_params : @optional_params
 
-      name = name.to_s if Symbol === matcher
+      name = name.to_s if Symbol === name
 
       validator, desc = nil, validator if String === validator
       validator ||= /.+/
