@@ -30,7 +30,7 @@ class TestKepiEndpoint < Test::Unit::TestCase
 
 
   def test_path_params
-    id_param = @endpoint.required_params['id']
+    id_param = @endpoint.required_params.find{|par| par.name == 'id'}
 
     assert Kepi::Endpoint::Param === id_param
     assert_equal(/.+/, id_param.validator)
@@ -39,7 +39,7 @@ class TestKepiEndpoint < Test::Unit::TestCase
 
   def test_path_param_override
     @endpoint.required_param :id, Integer, "Id of the resource"
-    id_param = @endpoint.required_params['id']
+    id_param = @endpoint.required_params.find{|par| par.name == 'id'}
 
     assert_equal Integer, id_param.validator
     assert_equal "Id of the resource", id_param.description
@@ -48,7 +48,7 @@ class TestKepiEndpoint < Test::Unit::TestCase
 
   def test_optional_param
     @endpoint.optional_param :q, String, "Query to send"
-    id_param = @endpoint.optional_params['q']
+    id_param = @endpoint.optional_params.find{|par| par.name == 'q'}
 
     assert_equal String, id_param.validator
     assert_equal "Query to send", id_param.description
@@ -57,7 +57,7 @@ class TestKepiEndpoint < Test::Unit::TestCase
 
   def test_required_param
     @endpoint.required_param :q, String, "Query to send"
-    id_param = @endpoint.required_params['q']
+    id_param = @endpoint.required_params.find{|par| par.name == 'q'}
 
     assert_equal String, id_param.validator
     assert_equal "Query to send", id_param.description
@@ -66,7 +66,7 @@ class TestKepiEndpoint < Test::Unit::TestCase
 
   def test_add_param_required
     @endpoint.add_param :q, true, String, "Query to send"
-    id_param = @endpoint.required_params['q']
+    id_param = @endpoint.required_params.find{|par| par.name == 'q'}
 
     assert_equal String, id_param.validator
     assert_equal "Query to send", id_param.description
@@ -75,7 +75,7 @@ class TestKepiEndpoint < Test::Unit::TestCase
 
   def test_add_param_optional
     @endpoint.add_param :q, false, String, "Query to send"
-    id_param = @endpoint.optional_params['q']
+    id_param = @endpoint.optional_params.find{|par| par.name == 'q'}
 
     assert_equal String, id_param.validator
     assert_equal "Query to send", id_param.description
@@ -84,7 +84,7 @@ class TestKepiEndpoint < Test::Unit::TestCase
 
   def test_add_param_no_validator
     @endpoint.add_param :q, false, "Query to send"
-    id_param = @endpoint.optional_params['q']
+    id_param = @endpoint.optional_params.find{|par| par.name == 'q'}
 
     assert_equal(/.+/, id_param.validator)
     assert_equal "Query to send", id_param.description
