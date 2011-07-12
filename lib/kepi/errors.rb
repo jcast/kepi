@@ -3,6 +3,9 @@ class Kepi
   # Inherited by all Kepi exceptions.
   class Exception < ::Exception; end
 
+  # Raised when an endpoint is called but not defined
+  class EndpointUndefined < Kepi::Exception; end
+
   # There was an error with param validation (parent for other param errors).
   class ParamValidationError < Kepi::Exception;
     def initialize endpoint, msg=nil
@@ -25,4 +28,11 @@ class Kepi
 
   # An allowed param did not meet the validation criteria.
   class ParamInvalid < ParamValidationError; end
+end
+
+
+class Exception
+  def to_markup
+    msg = "== #{self.class}:\n<b>#{self.message}</b>\n\n---\n"
+  end
 end

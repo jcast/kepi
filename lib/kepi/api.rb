@@ -6,9 +6,6 @@ class Kepi
 
   class Api
 
-    # Raised when an endpoint is called but not defined
-    class EndpointUndefined < Kepi::Exception; end
-
     # Default content-type to return.
     DEFAULT_CONTENT_TYPE = "text/html"
 
@@ -268,7 +265,7 @@ class Kepi
     # Must return a valid Rack response Array. May be overridden by child class.
 
     def undefined_response env
-      msg = "= Endpoint Undefined:\n"
+      msg = "== Endpoint Undefined:\n"
       msg << "<b>No endpoint responded to #{env['PATH_INFO']}</b>\n\n---\n"
       msg << to_markup
 
