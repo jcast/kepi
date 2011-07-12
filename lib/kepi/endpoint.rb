@@ -5,6 +5,9 @@ class Kepi
 
   class Endpoint
 
+    # Placeholder to match any param value.
+    module ANY_VALUE;end
+
     class Param < Struct.new(:name, :required, :validator, :description)
       def to_markup
         "* #{name.to_s}: #{validator.inspect}\n  #{description}"
@@ -176,7 +179,6 @@ STR
       return if name.to_s.empty?
 
       validator, desc = nil, validator if String === validator
-      validator ||= /.+/
 
       @params[name] = Param.new(name, required, validator, desc)
     end

@@ -6,11 +6,11 @@ class TestKepiEndpoint < Test::Unit::TestCase
     @endpoint = Kepi::Endpoint.new :get, "resource/:id"
     @endpoint.description = "Get the resource with specified id"
 
-    @endpoint.required_param /^search_term|q$/, String
+    @endpoint.required_param(/^search_term|q$/, String)
     @endpoint.required_param :zip, /\d{5}(-\d{4})?/
 
-    @endpoint.optional_param /^limit|h$/,  Integer
-    @endpoint.optional_param /^offset|o$/, Integer
+    @endpoint.optional_param(/^limit|h$/,  Integer)
+    @endpoint.optional_param(/^offset|o$/, Integer)
 
     @matcher_hash = @endpoint.required_params
   end
@@ -33,7 +33,7 @@ class TestKepiEndpoint < Test::Unit::TestCase
     id_param = @endpoint.required_params.find{|par| par.name == 'id'}
 
     assert Kepi::Endpoint::Param === id_param
-    assert_equal(/.+/, id_param.validator)
+    assert_equal(nil, id_param.validator)
   end
 
 
@@ -86,7 +86,7 @@ class TestKepiEndpoint < Test::Unit::TestCase
     @endpoint.add_param :q, false, "Query to send"
     id_param = @endpoint.optional_params.find{|par| par.name == 'q'}
 
-    assert_equal(/.+/, id_param.validator)
+    assert_equal(nil, id_param.validator)
     assert_equal "Query to send", id_param.description
   end
 
