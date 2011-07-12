@@ -174,7 +174,7 @@ class TestKepiEndpoint < Test::Unit::TestCase
       :thing  => "oops"
     }
 
-    assert_raises Kepi::Endpoint::ParamUndefined do
+    assert_raises Kepi::ParamUndefined do
       assert @endpoint.validate(params)
     end
   end
@@ -200,7 +200,7 @@ class TestKepiEndpoint < Test::Unit::TestCase
       :zip => 91026
     }
 
-    assert_raises Kepi::Endpoint::ParamMissing do
+    assert_raises Kepi::ParamMissing do
       assert @endpoint.validate(params)
     end
   end

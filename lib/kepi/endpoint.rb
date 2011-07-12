@@ -10,22 +10,10 @@ class Kepi
 
     class Param < Struct.new(:name, :required, :validator, :description)
       def to_markup
-        "* #{name.to_s}: #{validator.inspect}\n  #{description}"
+        valid_val = validator || "<em>[ANY]</em>"
+        "* *#{name.to_s}*: #{valid_val}\n  #{description}"
       end
     end
-
-
-    # There was an error with param validation (parent for other param errors).
-    class ParamValidationError < Kepi::Exception; end
-
-    # One or more params called are not defined in the endpoint.
-    class ParamUndefined < ParamValidationError; end
-
-    # A required param is missing.
-    class ParamMissing < ParamValidationError; end
-
-    # An allowed param did not meet the validation criteria.
-    class ParamInvalid < ParamValidationError; end
 
 
     # Don't take into account given params that aren't defined in the endpoint.
@@ -96,7 +84,8 @@ class Kepi
 = #{@http_method} #{@path}
 <b><em>#{@description}</em></b>
 
-=== Strict Params: #{!@allow_undefined_params}
+This endpoint <b><em>DOES#{" NOT" if !@allow_undefined_params}</em></b> allow
+undefined params.
 
 === Mandatory Params:
 #{ required }
@@ -245,9 +234,9 @@ STR
     # Raises an error if not.
     #
     # Errors raised may be:
-    #   Kepi::Endpoint::ParamMissing - required param is missing
-    #   Kepi::Endpoint::ParamInvalid - allowed param does not meet criteria
-    #   Kepi::Endpoint::ParamUndefined - only if endpoint is strict with params
+    #   Kepi::ParamMissing - required param is missing
+    #   Kepi::ParamInvalid - allowed param does not meet criteria
+    #   Kepi::ParamUndefined - only if endpoint is strict with params
 
     def validate params
       params = params.dup
@@ -257,21 +246,24 @@ STR
                           match_value mparam.name, pname
                         end
 
-        raise ParamMissing, "No param name matches #{mkey.inspect}" if
+        pvalue = pvalue.to_i if pvalue.to_i.to_s == pvalue
+        pvalue = pvalue.to_f if pvalue.to_f.to_s == pvalue
+
+        raise ParamMissing.new(self, "No param name matches #{mkey.inspect}") if
           !pname && mparam.required
 
         next if !pname
 
-        raise ParamInvalid,
-          "Param #{pname} did not match #{mparam.validator.inspect}" unless
+        raise ParamInvalid.new(self,
+          "Param #{pname} did not match #{mparam.validator.inspect}") unless
           match_value mparam.validator, pvalue
 
         params.delete pname
       end
 
-      raise ParamUndefined,
-        "Param #{params.keys.map{|k| "'#{k}'"}.join ", "} not supported" unless
-          params.empty? || @allow_undefined_params
+      raise ParamUndefined.new(self,
+        "Param #{params.keys.map{|k| "\\'#{k}\\'"}.join ", "} not supported") if
+          !params.empty? && !@allow_undefined_params
 
       true
     end

@@ -211,11 +211,7 @@ class Kepi
     # Must return a valid Rack response Array. May be overridden by child class.
 
     def default_validation_error req, endpoint, error
-      msg = "= #{error.class}:\n<b>#{error.message}</b>\n\n---\n"
-      msg << endpoint.to_markup
-      msg << "\n\n---\n#{to_markup}"
-
-      response HTTP_INVALID, api_html(msg)
+      response HTTP_INVALID, api_html(error.to_markup)
     end
 
 

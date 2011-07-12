@@ -9,9 +9,7 @@ class Kepi
   # Location of this gem
   LIB_ROOT = File.dirname __FILE__
 
-  # Inherited by all Kepi exceptions.
-  class Exception < ::Exception; end
-
+  require 'kepi/errors'
   require 'kepi/api'
   require 'kepi/endpoint'
 end
